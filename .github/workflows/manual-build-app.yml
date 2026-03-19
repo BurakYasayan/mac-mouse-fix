@@ -45,18 +45,33 @@ jobs:
           echo "=== extracted error lines ==="
           grep -nE "error:|fatal error|\*\* BUILD FAILED \*\*|PhaseScriptExecution|CodeSign|Provisioning" build/xcodebuild.log | tail -n 200 || true
 
-      - name: Pack app artifact
+      - name: Prepare app artifact
         if: always()
         id: pack_app
         run: |
-          APP_PATH=$(find build -type d -name "Mac Mouse Fix.app" | head -n 1 || true)
+          APP_PATH=$(find build/Build/Products -type d -name "Mac Mouse Fix.app" | head -n 1 || true)
+          if [ -z "$APP_PATH" ]; then
+            APP_PATH=$(find build -type d -name "Mac Mouse Fix.app" | head -n 1 || true)
+          fi
+
           if [ -z "$APP_PATH" ]; then
             echo "Mac Mouse Fix.app not found under derived data."
             echo "app_found=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
-          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Mac-Mouse-Fix-unsigned.app.zip"
+          APP_SIZE_KB=$(du -sk "$APP_PATH" | awk '{print $1}')
+          echo "Found app at: $APP_PATH"
+          echo "App size (KB): $APP_SIZE_KB"
+
+          if [ "$APP_SIZE_KB" -lt 1000 ]; then
+            echo "App bundle is unexpectedly small."
+            echo "app_found=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          mkdir -p artifact
+          ditto "$APP_PATH" "artifact/Mac Mouse Fix.app"
           echo "app_found=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
@@ -64,7 +79,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Mac-Mouse-Fix-unsigned-app
-          path: Mac-Mouse-Fix-unsigned.app.zip
+          path: artifact/Mac Mouse Fix.app
           retention-days: 7
 
       - name: Upload build logs
