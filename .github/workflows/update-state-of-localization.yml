@@ -20,6 +20,7 @@ on:
 jobs:
   # This workflow contains a single job called "regenerate-acknowledgements"
   regenerate-state-of-localization:
+    if: github.repository_owner == 'noah-nuebling'
     
     # Runs on macos runner. That's because we use ibtool from the python script.
     runs-on: macos-latest
