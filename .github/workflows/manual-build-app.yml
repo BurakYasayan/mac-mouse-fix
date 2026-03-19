@@ -13,18 +13,30 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Show Xcode and schemes
+        run: |
+          xcodebuild -version
+          xcodebuild -list -project "Mouse Fix.xcodeproj"
+
       - name: Build Mac Mouse Fix (unsigned)
         run: |
+          mkdir -p build
+          set -o pipefail
           xcodebuild \
             -project "Mouse Fix.xcodeproj" \
-            -scheme "App - Release" \
+            -scheme "App" \
             -configuration Release \
+            -destination "generic/platform=macOS" \
             -derivedDataPath build \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
-            build
+            CODE_SIGN_IDENTITY="" \
+            build | tee build/xcodebuild.log
 
       - name: Pack app artifact
+        if: success()
         run: |
           APP_PATH=$(find build -type d -name "Mac Mouse Fix.app" | head -n 1)
           if [ -z "$APP_PATH" ]; then
@@ -35,8 +47,17 @@ jobs:
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Mac-Mouse-Fix-unsigned.app.zip"
 
       - name: Upload build artifact
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Mac-Mouse-Fix-unsigned-app
           path: Mac-Mouse-Fix-unsigned.app.zip
+          retention-days: 7
+
+      - name: Upload build logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Manual-Build-Logs
+          path: build/xcodebuild.log
           retention-days: 7
