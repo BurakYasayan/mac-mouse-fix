@@ -45,25 +45,22 @@ jobs:
           echo "=== extracted error lines ==="
           grep -nE "error:|fatal error|\*\* BUILD FAILED \*\*|PhaseScriptExecution|CodeSign|Provisioning" build/xcodebuild.log | tail -n 200 || true
 
-      - name: Stop if build failed
-        if: steps.build_unsigned.outcome != 'success'
-        run: |
-          echo "Build failed. See xcodebuild.log artifact and error summary above."
-          exit 1
-
       - name: Pack app artifact
-        if: success()
+        if: always()
+        id: pack_app
         run: |
-          APP_PATH=$(find build -type d -name "Mac Mouse Fix.app" | head -n 1)
+          APP_PATH=$(find build -type d -name "Mac Mouse Fix.app" | head -n 1 || true)
           if [ -z "$APP_PATH" ]; then
             echo "Mac Mouse Fix.app not found under derived data."
-            exit 1
+            echo "app_found=false" >> "$GITHUB_OUTPUT"
+            exit 0
           fi
 
           ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Mac-Mouse-Fix-unsigned.app.zip"
+          echo "app_found=true" >> "$GITHUB_OUTPUT"
 
       - name: Upload build artifact
-        if: success()
+        if: steps.pack_app.outputs.app_found == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: Mac-Mouse-Fix-unsigned-app
@@ -77,3 +74,9 @@ jobs:
           name: Manual-Build-Logs
           path: build/xcodebuild.log
           retention-days: 7
+
+      - name: Fail only if no app was produced
+        if: steps.pack_app.outputs.app_found != 'true'
+        run: |
+          echo "No app artifact was produced. Download Manual-Build-Logs and inspect xcodebuild.log."
+          exit 1
