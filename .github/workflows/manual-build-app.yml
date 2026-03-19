@@ -19,13 +19,15 @@ jobs:
           xcodebuild -list -project "Mouse Fix.xcodeproj"
 
       - name: Build Mac Mouse Fix (unsigned)
+        id: build_unsigned
+        continue-on-error: true
         run: |
           mkdir -p build
           set -o pipefail
           xcodebuild \
             -project "Mouse Fix.xcodeproj" \
-            -scheme "App" \
-            -configuration Release \
+            -scheme "Fast Build" \
+            -configuration Debug \
             -destination "generic/platform=macOS" \
             -derivedDataPath build \
             -skipPackagePluginValidation \
@@ -34,6 +36,20 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             build | tee build/xcodebuild.log
+
+      - name: Print error summary
+        if: always()
+        run: |
+          echo "=== xcodebuild tail (last 200 lines) ==="
+          tail -n 200 build/xcodebuild.log || true
+          echo "=== extracted error lines ==="
+          grep -nE "error:|fatal error|\*\* BUILD FAILED \*\*|PhaseScriptExecution|CodeSign|Provisioning" build/xcodebuild.log | tail -n 200 || true
+
+      - name: Stop if build failed
+        if: steps.build_unsigned.outcome != 'success'
+        run: |
+          echo "Build failed. See xcodebuild.log artifact and error summary above."
+          exit 1
 
       - name: Pack app artifact
         if: success()
