@@ -1,0 +1,42 @@
+name: Manual Build App
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-app:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Build Mac Mouse Fix (unsigned)
+        run: |
+          xcodebuild \
+            -project "Mouse Fix.xcodeproj" \
+            -scheme "App - Release" \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Pack app artifact
+        run: |
+          APP_PATH=$(find build -type d -name "Mac Mouse Fix.app" | head -n 1)
+          if [ -z "$APP_PATH" ]; then
+            echo "Mac Mouse Fix.app not found under derived data."
+            exit 1
+          fi
+
+          ditto -c -k --sequesterRsrc --keepParent "$APP_PATH" "Mac-Mouse-Fix-unsigned.app.zip"
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Mac-Mouse-Fix-unsigned-app
+          path: Mac-Mouse-Fix-unsigned.app.zip
+          retention-days: 7
